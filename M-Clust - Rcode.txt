@@ -1,0 +1,50 @@
+#Model Clustering
+
+library(cluster)
+library(mclust)
+
+setwd("D:/R_Out")
+
+#Read Data and Assign Rownames
+mydata1 = read.csv(file.choose(),header=TRUE)
+
+#mydata1<-subset(mydata1,mydata1$TotVisits>1)
+
+#mydata1 <- mydata1[sample(1:nrow(mydata1), 3000, replace=FALSE),]
+
+mydata <- mydata1[,2:3]
+
+rownames(mydata) <- mydata1[,1]
+
+mydata.orig = mydata1[,-1] #save orig data copy
+
+rownames(mydata.orig) <- mydata1[,1]
+
+# Prepare Data #
+
+mydata <- na.omit(mydata) # listwise deletion of missing
+
+mydata <- scale(mydata) # standardize variables
+
+fit <- Mclust(mydata)
+
+fit # view solution summary
+
+fit$BIC # lookup all the options attempted
+classif = fit$classification # classifn vector
+mydata1 = cbind(mydata.orig, classif) # append to dataset
+
+library(ggplot2)
+
+mydata1[,3]<-sapply(mydata1[,3],as.factor)
+
+qplot(DL., Sales.Stock, colour = classif, data = mydata1) + scale_color_brewer(palette="Set1")
+
+# Use only if you want to save the output
+write.table(mydata1,"Clusters.csv")#save output
+
+
+
+
+
+#sp<-ggplot(mtcars, aes(x=DL., y=Sales.Stock, color=classif)) + geom_point()

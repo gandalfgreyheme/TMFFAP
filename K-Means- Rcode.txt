@@ -1,0 +1,45 @@
+#KMeans Clustering
+
+library(cluster)
+library(mclust)
+
+setwd("D:/R_Out")
+
+#Read Data and Assign Rownames
+mydata1 = read.csv(file.choose(),header=TRUE)
+
+#mydata1<-subset(mydata1,mydata1$TotVisits>1)
+
+#mydata1 <- mydata1[sample(1:nrow(mydata1), 15000, replace=FALSE),]
+
+mydata <- mydata1[,2:3]
+
+rownames(mydata) <- mydata1[,1]
+
+mydata.orig = mydata1[,-1] #save orig data copy
+
+rownames(mydata.orig) <- mydata1[,1]
+
+
+# Determine number of clusters #
+wss <- (nrow(mydata)-1)*sum(apply(mydata,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(mydata, algorithm="Lloyd", centers=i, iter.max=100)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+# Look for an "elbow" in the scree plot #
+
+k1= 4
+
+# K-Means Cluster Analysis
+fit <- kmeans(mydata, k1) # k1 cluster solution
+
+# get cluster means
+aggregate(mydata.orig,by=list(fit$cluster),FUN=mean)
+# append cluster assignment
+mydata1 <- data.frame(mydata.orig, fit$cluster)
+
+# Use only if you want to save the output
+write.table(mydata1,"SB_Clust.csv")#save output
+
+# get cluster means
+cmeans=aggregate(mydata.orig,by=list(classif),FUN=mean); cmeans
+
