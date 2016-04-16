@@ -5,7 +5,7 @@ library(stringi)
 #library(SnowballC)
 
 #library(wordcloud)
-
+library
 library(slam)
 
 library(qdap)
@@ -20,15 +20,15 @@ setwd("D:/R_Out")
 
 #memory.limit(size=memory.limit()+20)
 
-k=10 #Number of topics for LDA
+k=30 #Number of topics for LDA
 
-MH_Extract<-read.csv("AS_LDA_Corpus_TabOnly.csv",header=TRUE) #import the full CSV file of the data import
+MH_Extract<-read.csv("Topic_Input.csv",header=TRUE) #import the full CSV file of the data import
 
 MH_Extract$Comments[MH_Extract$Comments==""] <- NA
 
 MH_Extract <- MH_Extract[is.na(MH_Extract$Comments)==0,]
 
-MH_Extract <- MH_Extract[sample(1:nrow(MH_Extract), 10000, replace=FALSE),]
+#MH_Extract <- MH_Extract[sample(1:nrow(MH_Extract), 10000, replace=FALSE),]
 
 SimplifyText <- function(x) {
   return(removePunctuation(removeNumbers(stripWhitespace(tolower(x))))) 
@@ -36,19 +36,53 @@ SimplifyText <- function(x) {
 
 fulltext = as.character(MH_Extract$Comments)
 
-#pole=polarity(SimplifyText(fulltext),)
+original<-sentiment_frame(positive.words,negative.words,
+                          pos.weights=1,neg.weights=-1)
 
-pole2=polarity(SimplifyText(fulltext), 
-              polarity.frame = qdapDictionaries::key.pol, constrain = FALSE,
-              negators = qdapDictionaries::negation.words,
-              amplifiers = qdapDictionaries::amplification.words,
-              deamplifiers = qdapDictionaries::deamplification.words,
-              question.weight = 0, amplifier.weight = 0.8, n.before = 4,
-              n.after = 2, rm.incomplete = FALSE)
+neg<-sentiment_frame(positive.words,negative.words,
+                         pos.weights=1,neg.weights=-10)
 
-sentiment=pole$all$polarity
+negative.words=c(negative.words,negation.words)
 
-MH_Extract<-data.frame(MH_Extract,Sentiment_Polarity=sentiment)
+superneg<-sentiment_frame(positive.words,negative.words,
+                         pos.weights=1,neg.weights=-10)
+
+#pole2=polarity(SimplifyText(fulltext), 
+#              polarity.frame = qdapDictionaries::key.pol, constrain = FALSE,
+#             negators = qdapDictionaries::negation.words,
+#              amplifiers = qdapDictionaries::amplification.words,
+#              deamplifiers = qdapDictionaries::deamplification.words,
+#              question.weight = 0, amplifier.weight = 0.8, n.before = 4,
+#              n.after = 2, rm.incomplete = FALSE)
+
+
+########################################################################
+# The pole function has been modified below.
+# If polarity.frame = superneg, then the algo will aggressively penalise for
+# negative words
+# If polarity.frame = neg, then algo will prioritise negative words
+# If polarity.frame = original, then the algo gives equal importance to positive
+# and negative words
+# n.before and n.after set to 0 as we're stripping punctuation. Because of which
+# modifiers start misbehaving e.g.:
+# Original text = Poor. will never ever come back
+# Stripped text = poor will never ever come back
+# Therefore -> polar word = "poor", modified by "never" negative of negative = 
+# positive - bad for bijniss
+########################################################################
+
+pole=polarity(SimplifyText(fulltext),polarity.frame=superneg,n.before=0,n.after=0
+              , constrain=TRUE) 
+
+
+sentiment=pole$all$polarity 
+
+#npole=polarity(SimplifyText(fulltext),polarity.frame=neg,n.before=0,n.after=0
+#                , constrain=TRUE)$all$polarity
+#pole=polarity(SimplifyText(fulltext),polarity.frame=original,n.before=0,n.after=0
+#                , constrain=TRUE)$all$polarity
+
+MH_Extract<-data.frame(MH_Extract,Sentiment=sentiment)
 
 write.csv(MH_Extract,file=paste("LDA",k,"Sentiments.csv")) 
 
@@ -117,9 +151,37 @@ myStopwords <- c("a","about","after","all","allen","allensolly","also","am",
                  "was","wat","we","wear","wears","well","were","what","when",
                  "which","will","wit","with","would","yes","you","your","yrs",
                  "plz","feel","really","help","please", "make","try", "one", "much", 
-                 "pls")
+                 "pls", "provide", "provided","providing","time", "visit", "visited",
+                 "visiting","require","required","increase","increasing","increased",
+                 "people","regular","expect","expected","expecting","add","added",
+                 "found","bring","inform","informed","person","select","selected",
+                 "call","calling","called","half","feedback")
 
 myCorpus <- tm_map(myCorpus, removeWords, myStopwords)
+
+myCorpus <- tm_map(myCorpus, removeWords, positive.words)
+
+nw1=negative.words[1:1500] #splitting qdap dictionary because of regex limit of ~2k words
+
+nw2=negative.words[1501:3000]
+
+nw3=negative.words[3001:4776]
+
+myCorpus <- tm_map(myCorpus, removeWords, nw1)
+
+myCorpus <- tm_map(myCorpus, removeWords, nw2)
+
+myCorpus <- tm_map(myCorpus, removeWords, nw3)
+
+myCorpus <- tm_map(myCorpus, removeWords, negation.words)
+
+myCorpus <- tm_map(myCorpus, removeWords, BuckleySaltonSWL)
+
+myCorpus <- tm_map(myCorpus, removeWords, OnixTxtRetToolkitSWL1)
+
+myCorpus <- tm_map(myCorpus, removeWords, deamplification.words)
+
+myCorpus <- tm_map(myCorpus, removeWords, preposition)
 
 myCorpus <- tm_map(myCorpus, stripWhitespace)  #strip extra spaces
 
@@ -130,11 +192,23 @@ stemDocumentfix <- function(x)
 
 myCorpus <- tm_map(myCorpus, stemDocumentfix)   #stems words to word roots e.g. manager, managed, managing -> manag
 
+#myTDM <- TermDocumentMatrix(myCorpus, control=list(wordLengths=c(1,Inf)))#, weighting = weightTfIdf))
+
+#rowTotals <-  row_sums(myTDM)
+
+#write.csv(rowTotals, "WordList.csv")
+
+
 myCorpus <- tm_map(myCorpus, PlainTextDocument)
+
+
+
 
 dtm.temp<-DocumentTermMatrix(myCorpus)
 
 dtm.temp$dimnames$Docs<-as.character(MH_Extract$UID)
+
+#dtm=dtm.temp
 
 
 rm(MH_Extract)
@@ -146,10 +220,10 @@ gc()
 
 RT <- apply(dtm.temp , 1, sum)
 
-dtm<-dtm.temp[RT>3,] #Include comments more than 3 words
+ dtm<-dtm.temp[RT>0,] #Include comments more than 3 words
 
 rm(dtm.temp)
-rm(RT)
+#rm(RT)
 
 gc()
 
@@ -179,7 +253,7 @@ ldaOut <-LDA(dtm,k, method="Gibbs", control=list(nstart=nstart, seed = seed, bes
 
 #docs to topics
 
-ldaOut.topics_3 <- as.matrix(topics(ldaOut,3))
+ldaOut.topics_3 <- as.matrix(topics(ldaOut,1))
 
 write.csv(ldaOut.topics_3,file=paste("LDAGibbs",k,"DocsToTopics_3.csv"))
 
